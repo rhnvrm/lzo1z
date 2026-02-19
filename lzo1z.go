@@ -360,38 +360,9 @@ func Decompress(src, dst []byte) (int, error) {
 			state = stateMatchNext
 
 		case stateMatchNext:
-			if ip >= inLen {
-				return op, ErrInputOverrun
-			}
-			t := int(src[ip])
-			ip++
-
-			if t >= 16 {
-				ip-- // Put back for match processing
-				state = stateMatch
-				continue
-			}
-
-			// M1 match - copies 3 bytes
-			if ip >= inLen {
-				return op, ErrInputOverrun
-			}
-			mOff := 1 + (t << 6) + int(src[ip]>>2)
-			ip++
-			lastMOff = mOff
-
-			if mOff > op {
-				return op, ErrLookbehindOverrun
-			}
-			if op+3 > outLen {
-				return op, ErrOutputOverrun
-			}
-			mPos := op - mOff
-			dst[op] = dst[mPos]
-			dst[op+1] = dst[mPos+1]
-			dst[op+2] = dst[mPos+2]
-			op += 3
-			state = stateMatchDone
+			// After copying trailing literals, the next opcode is parsed via
+			// the regular match path.
+			state = stateMatch
 		}
 	}
 
