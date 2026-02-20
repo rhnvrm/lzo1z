@@ -26,6 +26,7 @@ var (
 	ErrOutputOverrun     = errors.New("lzo1z: output buffer overrun")
 	ErrLookbehindOverrun = errors.New("lzo1z: lookbehind overrun (match references before output start)")
 	ErrCorrupted         = errors.New("lzo1z: corrupted input data")
+	ErrInputNotConsumed  = errors.New("lzo1z: input not fully consumed (extra bytes after EOF marker)")
 )
 
 // Decompress decompresses LZO1Z compressed data from src into dst.
@@ -364,6 +365,11 @@ func Decompress(src, dst []byte) (int, error) {
 			// the regular match path.
 			state = stateMatch
 		}
+	}
+
+	// Check for unconsumed input after EOF marker (matches C's LZO_E_INPUT_NOT_CONSUMED)
+	if ip < inLen {
+		return op, ErrInputNotConsumed
 	}
 
 	return op, nil

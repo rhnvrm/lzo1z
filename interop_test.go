@@ -13,6 +13,7 @@ package lzo1z
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 )
 
@@ -92,5 +93,83 @@ func TestDecompressCInteropRoundtrip(t *testing.T) {
 				tc.inputLen, len(tc.compressed), float64(len(tc.compressed))/float64(tc.inputLen)*100,
 				tc.inputLen, goN, float64(goN)/float64(tc.inputLen)*100)
 		})
+	}
+}
+
+func TestDecompressInputNotConsumed(t *testing.T) {
+	// C's safe decompressor returns LZO_E_INPUT_NOT_CONSUMED when there are
+	// extra bytes after the EOF marker (0x11 0x00 0x00). The Go decompressor
+	// should do the same to avoid silently masking data corruption.
+
+	// Compress some valid data first
+	input := []byte("Hello, World! Hello, World! Hello, World!")
+	dst := make([]byte, MaxCompressedSize(len(input)))
+	n, err := Compress(input, dst)
+	if err != nil {
+		t.Fatalf("Compress failed: %v", err)
+	}
+	compressed := dst[:n]
+
+	// Valid compressed data should decompress fine
+	out := make([]byte, len(input)+100)
+	_, err = Decompress(compressed, out)
+	if err != nil {
+		t.Fatalf("Valid data failed: %v", err)
+	}
+
+	// Append garbage after EOF marker - should return ErrInputNotConsumed
+	tests := []struct {
+		name  string
+		extra []byte
+	}{
+		{"one_byte", []byte{0x00}},
+		{"two_bytes", []byte{0xAB, 0xCD}},
+		{"many_bytes", []byte{0x01, 0x02, 0x03, 0x04, 0x05}},
+		{"looks_like_data", []byte{0x11, 0x00, 0x00}}, // another EOF marker
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			withGarbage := make([]byte, len(compressed)+len(tc.extra))
+			copy(withGarbage, compressed)
+			copy(withGarbage[len(compressed):], tc.extra)
+
+			out := make([]byte, len(input)+100)
+			_, err := Decompress(withGarbage, out)
+			if !errors.Is(err, ErrInputNotConsumed) {
+				t.Errorf("Expected ErrInputNotConsumed, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestDecompressDictionaryRejection(t *testing.T) {
+	// C supports lzo1z_999_compress_dict which produces data that requires
+	// a dictionary to decompress. The Go decompressor does not support
+	// dictionary decompression. Dictionary-compressed data will typically
+	// fail with ErrLookbehindOverrun because it references data that should
+	// be in the dictionary (before the output buffer start).
+	//
+	// This test documents the behavior: dictionary-compressed data produces
+	// an error rather than silently corrupting output.
+
+	// Simulate dict-compressed data: a valid-looking stream that references
+	// data at negative offsets (which would be in the dictionary).
+	// M3 match: opcode=0x20|1=0x21 (len=3), offset bytes pointing before output start
+	dictCompressed := []byte{
+		0x15, 0x41, 0x42, 0x43, 0x44, // literal: "ABCD"
+		0x21,       // M3: length = 3 (0x20 | 1)
+		0xFF, 0xFF, // offset bytes: very large offset (before output start)
+		0x11, 0x00, 0x00, // EOF
+	}
+
+	out := make([]byte, 1000)
+	_, err := Decompress(dictCompressed, out)
+	if err == nil {
+		t.Error("Expected error for dictionary-like compressed data, got nil")
+	}
+	// Should be a lookbehind overrun since the match references before output start
+	if !errors.Is(err, ErrLookbehindOverrun) {
+		t.Logf("Got error (acceptable): %v", err)
 	}
 }
