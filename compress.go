@@ -32,9 +32,9 @@ func Compress(src, dst []byte) (int, error) {
 		hashTable[i] = -maxOffset
 	}
 
-	ip := 0            // input position
-	op := 0            // output position
-	litStart := 0      // start of pending literals
+	ip := 0               // input position
+	op := 0               // output position
+	litStart := 0         // start of pending literals
 	isFirstOutput := true // whether we're at the start of output
 	inLen := len(src)
 	outLen := len(dst)

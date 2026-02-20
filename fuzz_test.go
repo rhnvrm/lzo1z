@@ -64,9 +64,9 @@ func FuzzDecompress(f *testing.F) {
 	f.Add([]byte{})
 	f.Add([]byte{0x00})
 	f.Add([]byte{0xff, 0xff, 0xff})
-	f.Add([]byte{0x20})            // Truncated M3
-	f.Add([]byte{0x11, 0x00})      // Truncated EOF
-	f.Add([]byte{0x40, 0x00})      // M2 with zero offset
+	f.Add([]byte{0x20})             // Truncated M3
+	f.Add([]byte{0x11, 0x00})       // Truncated EOF
+	f.Add([]byte{0x40, 0x00})       // M2 with zero offset
 	f.Add([]byte{0x10, 0x00, 0x00}) // M4 EOF marker
 
 	f.Fuzz(func(t *testing.T, input []byte) {
