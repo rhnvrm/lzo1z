@@ -198,7 +198,7 @@ func TestCompressExtendedLength(t *testing.T) {
 		t.Errorf("Roundtrip failed for extended length test")
 	}
 
-	t.Logf("Extended length test: %d -> %d bytes (%.1f%%)", 
+	t.Logf("Extended length test: %d -> %d bytes (%.1f%%)",
 		len(input), compLen, float64(compLen)/float64(len(input))*100)
 }
 

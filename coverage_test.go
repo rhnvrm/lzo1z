@@ -296,14 +296,14 @@ func TestDecompressAllMatchTypes(t *testing.T) {
 	}{
 		// M1 matches (small offset, after match)
 		{"m1_small", bytes.Repeat([]byte("ABAB"), 20)},
-		
+
 		// M2 matches with various offsets
 		{"m2_offset_1", bytes.Repeat([]byte("X"), 100)},
 		{"m2_offset_100", append(bytes.Repeat([]byte("Y"), 100), bytes.Repeat([]byte("Y"), 50)...)},
-		
+
 		// M3 matches with extended length
 		{"m3_long", bytes.Repeat([]byte("Z"), 300)},
-		
+
 		// Mixed patterns
 		{"mixed", []byte("AAAABBBBCCCCAAAABBBBCCCCAAAABBBBCCCC")},
 	}
@@ -331,13 +331,13 @@ func TestDecompressAllMatchTypes(t *testing.T) {
 func TestEmitLiteralsVeryLong(t *testing.T) {
 	// Test very long literal runs that need multiple 0x00 bytes
 	sizes := []int{500, 1000, 2000, 5000}
-	
+
 	for _, size := range sizes {
 		lit := make([]byte, size)
 		for i := range lit {
 			lit[i] = byte(i % 256)
 		}
-		
+
 		dst := make([]byte, size+100)
 		n, err := emitLiterals(lit, dst, true)
 		if err != nil {
@@ -347,7 +347,7 @@ func TestEmitLiteralsVeryLong(t *testing.T) {
 		if n < size {
 			t.Errorf("emitLiterals(%d) wrote only %d bytes", size, n)
 		}
-		
+
 		// Also test non-first
 		_, err = emitLiterals(lit, dst, false)
 		if err != nil {
@@ -359,21 +359,21 @@ func TestEmitLiteralsVeryLong(t *testing.T) {
 func TestDecompressStateTransitions(t *testing.T) {
 	// Test various state transitions in decompressor
 	// by creating inputs that follow specific paths
-	
+
 	tests := [][]byte{
 		// First byte > 17, t < 4: stateStart -> stateMatchNext
 		[]byte("AAA"),
-		
+
 		// First byte > 17, t >= 4: stateStart -> stateFirstLiteralRun
 		[]byte("AAAAAA"),
-		
+
 		// First byte <= 17: stateStart -> stateLiteralRun
 		bytes.Repeat([]byte("X"), 20),
-		
+
 		// Multiple matches with different offsets
 		[]byte("ABCDEFABCDEFABCDEF"),
 	}
-	
+
 	for i, input := range tests {
 		dst := make([]byte, MaxCompressedSize(len(input)))
 		n, err := Compress(input, dst)
@@ -381,7 +381,7 @@ func TestDecompressStateTransitions(t *testing.T) {
 			t.Errorf("test %d: Compress failed: %v", i, err)
 			continue
 		}
-		
+
 		out := make([]byte, len(input)+100)
 		m, err := Decompress(dst[:n], out)
 		if err != nil {
@@ -396,21 +396,21 @@ func TestDecompressStateTransitions(t *testing.T) {
 
 func TestDecompressEdgeCases(t *testing.T) {
 	// More edge cases for decompression error paths
-	
+
 	tests := []struct {
 		name string
 		data []byte
 	}{
 		// Extended M3 length with zeros
 		{"m3_ext_zeros", []byte{0x20, 0x00, 0x00, 0x01}},
-		
+
 		// M4 with extended length
 		{"m4_ext", []byte{0x10, 0x00, 0x00, 0x00}},
-		
+
 		// Truncated in middle of copy
 		{"truncated_copy", []byte{0x15, 0x41, 0x42}},
 	}
-	
+
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			out := make([]byte, 1000)
@@ -421,7 +421,7 @@ func TestDecompressEdgeCases(t *testing.T) {
 
 func TestMaxCompressedSizeEdgeCases(t *testing.T) {
 	tests := []int{0, 1, 15, 16, 17, 100, 1000, 65536}
-	
+
 	for _, n := range tests {
 		size := MaxCompressedSize(n)
 		if n > 0 && size <= n {
@@ -432,7 +432,7 @@ func TestMaxCompressedSizeEdgeCases(t *testing.T) {
 
 func TestEmitLiteralsBoundaryConditions(t *testing.T) {
 	// Test boundary conditions in emitLiterals
-	
+
 	// Test litLen = 4 (boundary between <= 3 and > 3)
 	lit4 := []byte("ABCD")
 	dst := make([]byte, 10)
@@ -440,7 +440,7 @@ func TestEmitLiteralsBoundaryConditions(t *testing.T) {
 	if err != nil || n != 5 {
 		t.Errorf("litLen=4 first: got n=%d err=%v", n, err)
 	}
-	
+
 	// Test litLen = 18 (boundary for extended encoding)
 	lit18 := bytes.Repeat([]byte("X"), 18)
 	dst = make([]byte, 30)
@@ -448,7 +448,7 @@ func TestEmitLiteralsBoundaryConditions(t *testing.T) {
 	if err != nil {
 		t.Errorf("litLen=18 first: err=%v", err)
 	}
-	
+
 	// Test litLen = 19 (first extended encoding)
 	lit19 := bytes.Repeat([]byte("X"), 19)
 	dst = make([]byte, 30)
@@ -456,7 +456,7 @@ func TestEmitLiteralsBoundaryConditions(t *testing.T) {
 	if err != nil {
 		t.Errorf("litLen=19 first: err=%v", err)
 	}
-	
+
 	// Test non-first with various lengths
 	for _, length := range []int{4, 5, 10, 18, 19, 50, 300} {
 		lit := bytes.Repeat([]byte("Y"), length)
@@ -470,14 +470,14 @@ func TestEmitLiteralsBoundaryConditions(t *testing.T) {
 
 func TestCompressSkipMatchConditions(t *testing.T) {
 	// Test conditions where matches are skipped
-	
+
 	// Input that would leave 1-3 trailing literals after a match
 	inputs := [][]byte{
 		[]byte("AAAABBBB1"),   // Would leave 1 trailing
-		[]byte("AAAABBBB12"),  // Would leave 2 trailing  
+		[]byte("AAAABBBB12"),  // Would leave 2 trailing
 		[]byte("AAAABBBB123"), // Would leave 3 trailing
 	}
-	
+
 	for _, input := range inputs {
 		dst := make([]byte, MaxCompressedSize(len(input)))
 		n, err := Compress(input, dst)
@@ -485,7 +485,7 @@ func TestCompressSkipMatchConditions(t *testing.T) {
 			t.Errorf("Compress(%q) failed: %v", string(input), err)
 			continue
 		}
-		
+
 		out := make([]byte, len(input)+10)
 		m, err := Decompress(dst[:n], out)
 		if err != nil {
@@ -516,7 +516,7 @@ func TestDecompressMalformedInput(t *testing.T) {
 		// M4 near EOF marker
 		{0x11, 0x01, 0x00},
 	}
-	
+
 	for i, data := range malformed {
 		out := make([]byte, 1000)
 		_, err := Decompress(data, out)
@@ -530,7 +530,7 @@ func TestCompressLiteralsOnlyError(t *testing.T) {
 	// Test compressLiteralsOnly with small output buffer
 	input := []byte("AB")
 	dst := make([]byte, 2) // Too small for output + EOF
-	
+
 	_, err := Compress(input, dst)
 	if err == nil {
 		t.Error("expected error for small buffer")
